@@ -21,6 +21,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400..900&family=Outfit:wght@400..900&display=swap"
           rel="stylesheet"
         />
+        {/* Scroll-entrance animations are applied by JS; without it, show everything. */}
+        <noscript>
+          <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
+        </noscript>
       </head>
       <body className="font-body text-white">{children}</body>
     </html>

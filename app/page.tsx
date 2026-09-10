@@ -3,23 +3,28 @@
 import { useEffect, useRef, useState } from "react";
 
 /*
-  THESIS: A pre-launch page that argues the product is a sport, not an app — headline, gameplay
-  slot, then the $500 launch-week hook as the page's centerpiece, all pointed at one email field.
+  THESIS: The $500 launch-week challenge is the hook, so it sits one short scroll from the
+  headline — proof and explanation come after the reason to act, not before it.
   OWN-WORLD: The app's own ground, not flat black — green-black surfaces (#0E1210 / #12160E)
-  warmed toward lime, alternating raised bands, hairline lime-tinted borders, and low-opacity lime
-  blooms bleeding behind hero, challenge and close. Lime is the atmosphere; only the CTAs and the
-  prize figure are allowed to be loud.
-  STORY: A cold visitor learns from the headline alone that reps are camera-judged and ranked, sees
-  the gameplay slot, hits the $500 challenge, and joins the waitlist to not miss it.
-  FIRST VIEWPORT: Mark, AI-JUDGED pill, the headline doing the full explaining, and the 9:16 clip
-  slot — no stat row and no account buttons competing with it.
-  FORM: Theme overhaul plus reorder — hero copy carries the explanation, the challenge becomes the
-  centerpiece, the invite code is demoted below the waitlist.
+  warmed toward lime, alternating raised bands, hairline lime-tinted borders, low-opacity lime
+  blooms. Lime is the atmosphere; only the CTAs and the prize figure are allowed to be loud.
+  STORY: A cold visitor reads what VYRO is in two lines, glances at the gameplay slot, hits a
+  live countdown against $500, and leaves an email before scrolling any further.
+  FIRST VIEWPORT: Mark, AI-JUDGED pill, headline carrying the whole explanation, then a compact
+  9:16 slot — sized to support the copy, not to eat a screen of scroll on its own.
+  FORM: Challenge promoted above the feature cards, countdown for urgency, one shared scroll
+  entrance, sticky CTA after the hero.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the
   verdict, DESIGN.md, and every shipping raster carrying its provenance.
 */
 
 const VALID_CREATOR_CODES = ["VYROCREATOR", "ALPHA", "FOUNDER", "VIP1"];
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PLACEHOLDER LAUNCH DATE — stand-in until the real launch date is locked.
+   Swap this one line; the countdown and every "launch week" line read from it.
+   ───────────────────────────────────────────────────────────────────────────── */
+const LAUNCH_DATE = new Date("2026-10-05T12:00:00Z");
 
 type CreatorState = "idle" | "checking" | "granted" | "invalid";
 
@@ -31,14 +36,39 @@ export default function Page() {
   const [creatorCode, setCreatorCode] = useState("");
   const [creatorState, setCreatorState] = useState<CreatorState>("idle");
   const [unlocked, setUnlocked] = useState(false);
+  const [showSticky, setShowSticky] = useState(false);
 
   const inviteInputRef = useRef<HTMLInputElement | null>(null);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const waitlistRef = useRef<HTMLElement | null>(null);
+  const heroRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (showInvite) inviteInputRef.current?.focus();
   }, [showInvite]);
+
+  // Sticky CTA lives only in the middle of the page: past the hero, and gone again
+  // once the real form is on screen so it never covers what it points at.
+  useEffect(() => {
+    const hero = heroRef.current;
+    const waitlist = waitlistRef.current;
+    if (!hero || !waitlist || typeof IntersectionObserver === "undefined") return;
+    let heroVisible = true;
+    let waitlistVisible = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target === hero) heroVisible = entry.isIntersecting;
+          if (entry.target === waitlist) waitlistVisible = entry.isIntersecting;
+        }
+        setShowSticky(!heroVisible && !waitlistVisible);
+      },
+      { threshold: 0 },
+    );
+    io.observe(hero);
+    io.observe(waitlist);
+    return () => io.disconnect();
+  }, []);
 
   function scrollToWaitlist() {
     waitlistRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -89,7 +119,7 @@ export default function Page() {
           }}
         />
         <div
-          className="absolute left-1/2 top-[45%] h-[60vh] w-[120vw] max-w-[1300px] -translate-x-1/2"
+          className="absolute left-1/2 top-[38%] h-[60vh] w-[120vw] max-w-[1300px] -translate-x-1/2"
           style={{ background: "radial-gradient(ellipse 50% 50% at 50% 50%, rgba(200,255,0,.055), transparent 70%)" }}
         />
         <div
@@ -100,8 +130,8 @@ export default function Page() {
       <div aria-hidden className="bg-grain pointer-events-none fixed inset-0 z-0 opacity-[.03] mix-blend-overlay" />
 
       <div className="relative z-10">
-        {/* ───────────── hero ───────────── */}
-        <section className="px-5 pb-14 pt-12 sm:px-8">
+        {/* ───────────── 1. hero ───────────── */}
+        <section ref={heroRef} className="px-5 pb-10 pt-12 sm:px-8">
           <div className="mx-auto flex max-w-[560px] flex-col items-center text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-lime/20 bg-surface-warm shadow-[0_0_40px_-6px_rgba(204,255,0,.45),inset_0_1px_0_rgba(204,255,0,.10)]">
               <svg viewBox="0 0 200 200" fill="none" aria-hidden className="h-9 w-9">
@@ -127,8 +157,8 @@ export default function Page() {
               ranked ladder. No self-reported scores. No honor system.
             </p>
 
-            {/* 9:16 gameplay slot — empty until a real clip lands */}
-            <div className="relative mt-9 flex aspect-[9/16] w-[80%] max-w-[290px] flex-col items-center justify-center gap-3 overflow-hidden rounded-[28px] border border-lime/[.14] bg-gradient-to-b from-surface-warm via-[#0b0f09] to-[#080b06] shadow-[0_50px_110px_-35px_rgba(0,0,0,0.9),0_0_60px_-25px_rgba(204,255,0,.35),inset_0_1px_0_rgba(204,255,0,.08)]">
+            {/* ── 2. compact 9:16 gameplay slot ── */}
+            <div className="relative mt-7 flex aspect-[9/16] w-[46%] max-w-[178px] flex-col items-center justify-center gap-2.5 overflow-hidden rounded-[22px] border border-lime/[.14] bg-gradient-to-b from-surface-warm via-[#0b0f09] to-[#080b06] shadow-[0_30px_70px_-30px_rgba(0,0,0,.9),0_0_50px_-25px_rgba(204,255,0,.35),inset_0_1px_0_rgba(204,255,0,.08)]">
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-0"
@@ -136,66 +166,33 @@ export default function Page() {
                   background: "radial-gradient(ellipse 100% 55% at 50% 6%, rgba(200,255,0,.16), transparent 62%)",
                 }}
               />
+              {/* line-art stand-in so the slot reads as gameplay, not a dead box */}
+              <PushUpFigure className="pointer-events-none absolute inset-x-0 bottom-7 mx-auto w-[78%] opacity-[.28]" />
               <div
                 aria-hidden
-                className="relative flex h-14 w-14 items-center justify-center rounded-full border border-lime/25 bg-lime/[.07]"
+                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-lime/25 bg-lime/[.07]"
               >
-                <svg viewBox="0 0 24 24" className="ml-0.5 h-5 w-5 fill-lime">
+                <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 fill-lime">
                   <path d="M6 4l14 8-14 8z" />
                 </svg>
               </div>
-              <span className="relative text-[11px] font-semibold tracking-wide text-white/35">
+              <span className="relative px-3 text-center text-[9.5px] font-semibold leading-tight tracking-wide text-white/35">
                 Gameplay clip coming soon
               </span>
             </div>
           </div>
         </section>
 
-        {/* ───────────── what VYRO is ───────────── */}
-        <section className="band-raised px-5 py-16 sm:px-8">
-          <div className="mx-auto max-w-[560px]">
-            <h2 className="font-display text-[27px] font-black leading-tight tracking-tight text-white">
-              This isn&rsquo;t a workout app.
-            </h2>
-            <p className="mt-3 text-[14px] font-medium leading-relaxed text-white/55">
-              It&rsquo;s a ranked sport, and your phone is the referee.
-            </p>
-
-            <div className="mt-7 flex flex-col gap-3">
-              <Card>
-                <CardTitle>The AI judges every rep</CardTitle>
-                <CardBody>
-                  Prop your phone up and go. Pose tracking watches your form in real time — full range
-                  or it doesn&rsquo;t count. Nobody types in a score. There is nothing to lie about.
-                </CardBody>
-              </Card>
-              <Card>
-                <CardTitle>A ladder that means something</CardTitle>
-                <CardBody>
-                  Every battle moves your RP. Climb from Bronze to Master, check where you sit on the
-                  global board or just among your friends, then defend it when the season resets.
-                </CardBody>
-              </Card>
-              <Card>
-                <CardTitle>Call somebody out</CardTitle>
-                <CardBody>
-                  Challenge a friend directly or get matched with a stranger who thinks they&rsquo;re
-                  better. Share the result either way. Winner takes the RP, loser gets to explain.
-                </CardBody>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* ───────────── launch week challenge (centerpiece) ───────────── */}
-        <section className="relative px-5 py-20 sm:px-8">
+        {/* ───────────── 3. launch week challenge (promoted, breaks the column) ───────────── */}
+        <section className="relative px-4 pb-16 pt-6 sm:px-8">
           <div
             aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[130%] max-w-[900px] -translate-x-1/2 -translate-y-1/2 blur-3xl"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[560px] w-[130%] max-w-[900px] -translate-x-1/2 -translate-y-1/2 blur-3xl"
             style={{ background: "radial-gradient(ellipse 50% 50% at 50% 50%, rgba(200,255,0,.22), transparent 68%)" }}
           />
-          <div className="relative mx-auto max-w-[560px]">
-            <div className="overflow-hidden rounded-[32px] border border-lime/30 bg-gradient-to-b from-[#1a2010] via-surface-warm to-[#0b0f08] p-8 shadow-[0_40px_90px_-30px_rgba(0,0,0,.9),0_0_80px_-30px_rgba(204,255,0,.55),inset_0_1px_0_rgba(204,255,0,.16)] sm:p-10">
+          {/* wider than the 560px reading column on purpose — the centerpiece breaks the grid */}
+          <Reveal className="relative mx-auto max-w-[620px]">
+            <div className="overflow-hidden rounded-[32px] border border-lime/30 bg-gradient-to-b from-[#1a2010] via-surface-warm to-[#0b0f08] p-7 shadow-[0_40px_90px_-30px_rgba(0,0,0,.9),0_0_80px_-30px_rgba(204,255,0,.55),inset_0_1px_0_rgba(204,255,0,.16)] sm:p-10">
               <div className="flex items-start justify-between gap-4">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 font-display text-[9.5px] font-extrabold tracking-[.14em] text-lime">
                   <span className="h-[5px] w-[5px] animate-pulseDot rounded-full bg-lime" />
@@ -204,13 +201,13 @@ export default function Page() {
                 <StopwatchIcon />
               </div>
 
-              <h2 className="mt-6 font-display text-[24px] font-black leading-[1.1] tracking-tight text-white">
+              <h2 className="mt-5 font-display text-[24px] font-black leading-[1.1] tracking-tight text-white">
                 Launch Week Challenge
               </h2>
 
               {/* prize figure — the one loud element on the page */}
-              <div className="mt-5 flex items-end gap-3">
-                <span className="font-display text-[68px] font-black leading-[.85] tracking-tighter text-lime [text-shadow:0_0_40px_rgba(204,255,0,.55),0_0_90px_rgba(204,255,0,.25)] sm:text-[80px]">
+              <div className="mt-4 flex items-end gap-3">
+                <span className="animate-prizeGlow font-display text-[68px] font-black leading-[.85] tracking-tighter text-lime sm:text-[84px]">
                   $500
                 </span>
                 <span className="pb-2 font-display text-[12px] font-extrabold uppercase leading-tight tracking-[.12em] text-lime-text/70">
@@ -220,9 +217,11 @@ export default function Page() {
                 </span>
               </div>
 
-              <div className="mt-7 h-px bg-gradient-to-r from-transparent via-lime/25 to-transparent" />
+              {/* ── 4. countdown ── */}
+              <Countdown />
 
-              {/* terms split into distinct rows rather than one dense paragraph */}
+              <div className="mt-6 h-px bg-gradient-to-r from-transparent via-lime/25 to-transparent" />
+
               <dl className="mt-6 flex flex-col gap-5">
                 <TermRow icon={<ClockIcon />} label="The rule">
                   60 seconds. Most valid push-ups wins.
@@ -244,71 +243,129 @@ export default function Page() {
                 Claim your spot before launch week
               </button>
             </div>
-          </div>
+          </Reveal>
         </section>
 
-        {/* ───────────── how it works ───────────── */}
+        {/* ───────────── 4. what VYRO is ───────────── */}
         <section className="band-raised px-5 py-16 sm:px-8">
           <div className="mx-auto max-w-[560px]">
-            <h2 className="font-display text-[27px] font-black leading-tight tracking-tight text-white">
-              How it works.
-            </h2>
-            <ol className="mt-7">
-              <Step n={1}>Pick your exercise — push-ups or squats.</Step>
-              <Step n={2}>Get matched, or call out a friend.</Step>
-              <Step n={3}>Prop your phone up. The AI counts only clean reps.</Step>
-              <Step n={4} last>
-                Take the RP and climb the ladder.
-              </Step>
-            </ol>
+            <Reveal>
+              <h2 className="font-display text-[27px] font-black leading-tight tracking-tight text-white">
+                This isn&rsquo;t a workout app.
+              </h2>
+              <p className="mt-3 text-[14px] font-medium leading-relaxed text-white/55">
+                It&rsquo;s a ranked sport, and your phone is the referee.
+              </p>
+            </Reveal>
+
+            <div className="mt-7 flex flex-col gap-3">
+              <Reveal>
+                <Card>
+                  <CardTitle>The AI judges every rep</CardTitle>
+                  <CardBody>
+                    Prop your phone up and go. Pose tracking watches your form in real time — full
+                    range or it doesn&rsquo;t count. Nobody types in a score. There is nothing to lie
+                    about.
+                  </CardBody>
+                </Card>
+              </Reveal>
+              <Reveal>
+                <Card>
+                  <CardTitle>A ladder that means something</CardTitle>
+                  <CardBody>
+                    Every battle moves your RP. Climb from Bronze to Master, check where you sit on
+                    the global board or just among your friends, then defend it when the season
+                    resets.
+                  </CardBody>
+                </Card>
+              </Reveal>
+              <Reveal>
+                {/* wider treatment: the VS mark earns this card more room than the two above */}
+                <Card>
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="min-w-0">
+                      <CardTitle>Call somebody out</CardTitle>
+                      <CardBody>
+                        Challenge a friend directly or get matched with a stranger who thinks
+                        they&rsquo;re better. Winner takes the RP, loser gets to explain.
+                      </CardBody>
+                    </div>
+                    <VsMark className="mt-1 hidden w-[74px] flex-shrink-0 sm:block" />
+                  </div>
+                </Card>
+              </Reveal>
+            </div>
           </div>
         </section>
 
-        {/* ───────────── waitlist ───────────── */}
-        <section ref={waitlistRef} className="scroll-mt-10 px-5 py-20 sm:px-8">
+        {/* ───────────── 5. how it works ───────────── */}
+        <section className="px-5 py-16 sm:px-8">
           <div className="mx-auto max-w-[560px]">
-            <div className="rounded-[28px] border border-lime/[.16] bg-gradient-to-b from-surface-warm to-[#0b0f09] p-7 shadow-[0_30px_70px_-30px_rgba(0,0,0,.85),0_0_60px_-30px_rgba(204,255,0,.4),inset_0_1px_0_rgba(204,255,0,.10)] sm:p-8">
-              <div className="font-display text-[10.5px] font-extrabold tracking-[.14em] text-lime">
-                JOIN THE WAITLIST
-              </div>
-              <h2 className="mt-3 font-display text-[25px] font-black leading-tight tracking-tight text-white">
-                Get in before the ladder fills up.
+            <Reveal>
+              <h2 className="font-display text-[27px] font-black leading-tight tracking-tight text-white">
+                How it works.
               </h2>
-              <p className="mt-3 text-[13.5px] leading-relaxed text-white/55">
-                Leave your email and we&rsquo;ll tell you the moment VYRO opens up — in time for
-                launch week.
-              </p>
+            </Reveal>
+            <Reveal>
+              <ol className="mt-7">
+                <Step n={1}>Pick your exercise — push-ups or squats.</Step>
+                <Step n={2}>Get matched, or call out a friend.</Step>
+                <Step n={3}>Prop your phone up. The AI counts only clean reps.</Step>
+                <Step n={4} last>
+                  Take the RP and climb the ladder.
+                </Step>
+              </ol>
+            </Reveal>
+          </div>
+        </section>
 
-              {!waitlisted ? (
-                <form onSubmit={handleWaitlistSubmit} className="mt-6 flex flex-col gap-2.5">
-                  <input
-                    ref={emailInputRef}
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    autoComplete="email"
-                    className="w-full rounded-2xl border border-lime/[.18] bg-[#080b06]/80 px-4 py-4 text-[14.5px] font-medium text-white placeholder:text-white/30 focus:border-lime focus:bg-lime/[.06] focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full rounded-full bg-gradient-to-br from-lime-bright via-lime to-lime-deep py-[18px] font-display text-[16px] font-black tracking-tight text-lime-ink shadow-[0_0_0_1px_rgba(204,255,0,.4),0_18px_46px_-12px_rgba(204,255,0,.7),0_0_60px_-8px_rgba(204,255,0,.5)] transition-transform duration-300 ease-out hover:-translate-y-0.5 active:scale-[.98]"
-                  >
-                    JOIN THE WAITLIST
-                  </button>
-                </form>
-              ) : (
-                <div className="mt-6 flex items-center gap-3 rounded-2xl border border-lime/40 bg-lime/10 px-5 py-4">
-                  <CheckIcon />
-                  <span className="font-display text-[13px] font-bold text-lime">
-                    You&rsquo;re on the list. We&rsquo;ll notify you when VYRO drops.
-                  </span>
+        {/* ───────────── 6. waitlist ───────────── */}
+        <section ref={waitlistRef} className="band-raised scroll-mt-10 px-5 py-20 sm:px-8">
+          <div className="mx-auto max-w-[560px]">
+            <Reveal>
+              <div className="rounded-[28px] border border-lime/[.16] bg-gradient-to-b from-surface-warm to-[#0b0f09] p-7 shadow-[0_30px_70px_-30px_rgba(0,0,0,.85),0_0_60px_-30px_rgba(204,255,0,.4),inset_0_1px_0_rgba(204,255,0,.10)] sm:p-8">
+                <div className="font-display text-[10.5px] font-extrabold tracking-[.14em] text-lime">
+                  JOIN THE WAITLIST
                 </div>
-              )}
-            </div>
+                <h2 className="mt-3 font-display text-[25px] font-black leading-tight tracking-tight text-white">
+                  Get in before the ladder fills up.
+                </h2>
+                <p className="mt-3 text-[13.5px] leading-relaxed text-white/55">
+                  Leave your email and we&rsquo;ll tell you the moment VYRO opens up — in time for
+                  launch week.
+                </p>
 
-            {/* invite code — secondary path, deliberately outside and below the card */}
+                {!waitlisted ? (
+                  <form onSubmit={handleWaitlistSubmit} className="mt-6 flex flex-col gap-2.5">
+                    <input
+                      ref={emailInputRef}
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      autoComplete="email"
+                      className="w-full rounded-2xl border border-lime/[.18] bg-[#080b06]/80 px-4 py-4 text-[14.5px] font-medium text-white placeholder:text-white/30 focus:border-lime focus:bg-lime/[.06] focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full rounded-full bg-gradient-to-br from-lime-bright via-lime to-lime-deep py-[18px] font-display text-[16px] font-black tracking-tight text-lime-ink shadow-[0_0_0_1px_rgba(204,255,0,.4),0_18px_46px_-12px_rgba(204,255,0,.7),0_0_60px_-8px_rgba(204,255,0,.5)] transition-transform duration-300 ease-out hover:-translate-y-0.5 active:scale-[.98]"
+                    >
+                      JOIN THE WAITLIST
+                    </button>
+                  </form>
+                ) : (
+                  <div className="mt-6 flex items-center gap-3 rounded-2xl border border-lime/40 bg-lime/10 px-5 py-4">
+                    <CheckIcon />
+                    <span className="font-display text-[13px] font-bold text-lime">
+                      You&rsquo;re on the list. We&rsquo;ll notify you when VYRO drops.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Reveal>
+
+            {/* invite code — secondary path, outside and below the card */}
             <div className="mt-6 text-center">
               {unlocked ? (
                 <div className="inline-flex items-center gap-2.5 rounded-full border border-lime/35 bg-lime/[.08] px-5 py-3">
@@ -379,7 +436,115 @@ export default function Page() {
           </div>
         </section>
       </div>
+
+      {/* ───────────── sticky mini-CTA ───────────── */}
+      {showSticky && !waitlisted && (
+        <div className="fixed inset-x-0 bottom-0 z-40 animate-stickyIn px-4 pb-4 sm:pb-5">
+          <div className="mx-auto flex max-w-[420px] items-center gap-3 rounded-full border border-lime/25 bg-surface-warm/90 py-2 pl-4 pr-2 shadow-[0_18px_40px_-16px_rgba(0,0,0,.9),0_0_40px_-20px_rgba(204,255,0,.6)] backdrop-blur-xl">
+            <span className="min-w-0 flex-1 truncate font-display text-[12px] font-bold text-white/70">
+              $500 challenge · launch week
+            </span>
+            <button
+              type="button"
+              onClick={scrollToWaitlist}
+              className="flex-shrink-0 rounded-full bg-gradient-to-br from-lime-bright via-lime to-lime-deep px-5 py-2.5 font-display text-[12.5px] font-extrabold tracking-tight text-lime-ink shadow-[0_8px_20px_-8px_rgba(204,255,0,.7)] transition-transform hover:-translate-y-0.5 active:scale-[.98]"
+            >
+              Join the waitlist
+            </button>
+          </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+/* ───────────── motion ───────────── */
+
+/* One entrance for the whole page: fade up 14px once the block crosses into view. */
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      el.classList.add("reveal-in");
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("reveal-in");
+          io.disconnect();
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`reveal ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/* ───────────── countdown ───────────── */
+
+function Countdown() {
+  // null until mounted so server and client render the same markup, then it ticks.
+  const [left, setLeft] = useState<{ d: number; h: number; m: number } | null>(null);
+
+  useEffect(() => {
+    function tick() {
+      const ms = LAUNCH_DATE.getTime() - Date.now();
+      if (ms <= 0) {
+        setLeft({ d: 0, h: 0, m: 0 });
+        return;
+      }
+      const totalMinutes = Math.floor(ms / 60000);
+      setLeft({
+        d: Math.floor(totalMinutes / 1440),
+        h: Math.floor((totalMinutes % 1440) / 60),
+        m: totalMinutes % 60,
+      });
+    }
+    tick();
+    const id = window.setInterval(tick, 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const live = left !== null && (left.d > 0 || left.h > 0 || left.m > 0);
+
+  return (
+    <div className="mt-6 rounded-2xl border border-lime/20 bg-[#080b06]/60 p-4">
+      <div className="flex items-center gap-1.5">
+        <span className="h-[5px] w-[5px] animate-pulseDot rounded-full bg-lime" />
+        <span className="font-display text-[9.5px] font-extrabold uppercase tracking-[.14em] text-lime-text/75">
+          {live || left === null ? "Launch week starts in" : "Launch week is live"}
+        </span>
+      </div>
+      <div className="mt-3 flex gap-2.5">
+        <CountUnit value={left?.d} label="Days" />
+        <CountUnit value={left?.h} label="Hours" />
+        <CountUnit value={left?.m} label="Mins" />
+      </div>
+    </div>
+  );
+}
+
+function CountUnit({ value, label }: { value?: number; label: string }) {
+  return (
+    <div className="flex-1 rounded-xl border border-lime/[.14] bg-gradient-to-b from-lime/[.07] to-transparent py-2.5 text-center">
+      <div className="font-display text-[26px] font-black leading-none tracking-tight text-white [font-variant-numeric:tabular-nums]">
+        {value === undefined ? "––" : String(value).padStart(2, "0")}
+      </div>
+      <div className="mt-1 font-display text-[8.5px] font-extrabold uppercase tracking-[.14em] text-white/35">
+        {label}
+      </div>
+    </div>
   );
 }
 
@@ -429,6 +594,56 @@ function Step({ n, children, last }: { n: number; children: React.ReactNode; las
       </div>
       <p className={`pt-2 text-[14px] font-medium leading-snug text-white/70 ${last ? "" : "pb-6"}`}>{children}</p>
     </li>
+  );
+}
+
+/* ───────────── line art ───────────── */
+
+/* Geometric push-up silhouette — joints and limbs only, matching the pose-tracking
+   overlay the app actually draws. */
+function PushUpFigure({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 120 62" aria-hidden className={className} fill="none">
+      <line x1="4" y1="56" x2="116" y2="56" stroke="rgba(204,255,0,.35)" strokeWidth="1" strokeDasharray="3 5" />
+      <g stroke="#CCFF00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M26 30 L58 38" />
+        <path d="M58 38 L72 50" />
+        <path d="M26 30 L24 50" />
+        <path d="M58 38 L92 44" />
+        <path d="M92 44 L104 54" />
+      </g>
+      <g fill="#CCFF00">
+        <circle cx="26" cy="30" r="2.6" />
+        <circle cx="58" cy="38" r="2.6" />
+        <circle cx="72" cy="50" r="2.6" />
+        <circle cx="24" cy="50" r="2.6" />
+        <circle cx="92" cy="44" r="2.6" />
+        <circle cx="104" cy="54" r="2.6" />
+      </g>
+      <circle cx="17" cy="24" r="5" stroke="#CCFF00" strokeWidth="2" />
+    </svg>
+  );
+}
+
+/* Stylized versus mark — two opposing chevrons around a hairline seam. */
+function VsMark({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 80 56" aria-hidden className={className} fill="none">
+      <path d="M6 10 L22 28 L6 46" stroke="rgba(204,255,0,.55)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M74 10 L58 28 L74 46" stroke="rgba(124,224,255,.45)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="40" y1="4" x2="40" y2="52" stroke="rgba(255,255,255,.14)" strokeWidth="1" strokeDasharray="3 4" />
+      <text
+        x="40"
+        y="34"
+        textAnchor="middle"
+        fill="#CCFF00"
+        fontSize="15"
+        fontWeight="900"
+        fontFamily="Outfit, Inter, sans-serif"
+      >
+        VS
+      </text>
+    </svg>
   );
 }
 

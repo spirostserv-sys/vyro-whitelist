@@ -35,9 +35,24 @@ const config: Config = {
           "0%, 100%": { opacity: "1", transform: "scale(1)" },
           "50%": { opacity: ".4", transform: "scale(.7)" },
         },
+        // Prize figure breathes rather than blinks — the glow swells, the text never moves.
+        prizeGlow: {
+          "0%, 100%": {
+            textShadow: "0 0 40px rgba(204,255,0,.45), 0 0 90px rgba(204,255,0,.18)",
+          },
+          "50%": {
+            textShadow: "0 0 55px rgba(204,255,0,.75), 0 0 120px rgba(204,255,0,.35)",
+          },
+        },
+        stickyIn: {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         pulseDot: "pulseDot 1.6s ease-in-out infinite",
+        prizeGlow: "prizeGlow 3.2s ease-in-out infinite",
+        stickyIn: "stickyIn .35s cubic-bezier(.16,1,.3,1) both",
       },
     },
   },
