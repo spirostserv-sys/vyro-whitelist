@@ -38,35 +38,51 @@ export default function Page() {
   const [unlocked, setUnlocked] = useState(false);
   const [showSticky, setShowSticky] = useState(false);
 
+  // The sticky bar keeps its own field and its own brief confirmation; the
+  // submission itself goes through the same path as the page form.
+  const [stickyEmail, setStickyEmail] = useState("");
+  const [stickySuccess, setStickySuccess] = useState(false);
+
   const inviteInputRef = useRef<HTMLInputElement | null>(null);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const waitlistRef = useRef<HTMLElement | null>(null);
+  const waitlistCardRef = useRef<HTMLDivElement | null>(null);
   const heroRef = useRef<HTMLElement | null>(null);
+  const stickySuccessTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (showInvite) inviteInputRef.current?.focus();
   }, [showInvite]);
 
+  useEffect(
+    () => () => {
+      if (stickySuccessTimer.current) window.clearTimeout(stickySuccessTimer.current);
+    },
+    [],
+  );
+
   // Sticky CTA lives only in the middle of the page: past the hero, and gone again
   // once the real form is on screen so it never covers what it points at.
   useEffect(() => {
     const hero = heroRef.current;
-    const waitlist = waitlistRef.current;
-    if (!hero || !waitlist || typeof IntersectionObserver === "undefined") return;
+    // Watch the form card itself, not the whole section — the bar should survive
+    // until the actual input is on screen, and come back when it leaves.
+    const card = waitlistCardRef.current;
+    if (!hero || !card || typeof IntersectionObserver === "undefined") return;
     let heroVisible = true;
-    let waitlistVisible = false;
+    let cardVisible = false;
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.target === hero) heroVisible = entry.isIntersecting;
-          if (entry.target === waitlist) waitlistVisible = entry.isIntersecting;
+          if (entry.target === card) cardVisible = entry.isIntersecting;
         }
-        setShowSticky(!heroVisible && !waitlistVisible);
+        setShowSticky(!heroVisible && !cardVisible);
       },
       { threshold: 0 },
     );
     io.observe(hero);
-    io.observe(waitlist);
+    io.observe(card);
     return () => io.disconnect();
   }, []);
 
@@ -75,15 +91,37 @@ export default function Page() {
     window.setTimeout(() => emailInputRef.current?.focus(), 600);
   }
 
-  function handleWaitlistSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
+  /* The one place a signup is recorded. Both the page form and the sticky bar call
+     it, so the two entry points cannot drift apart, and re-submitting the same
+     address (once from each) stores a single entry. */
+  function joinWaitlist(rawEmail: string): boolean {
+    const value = rawEmail.trim();
+    if (!value) return false;
     try {
-      const list = JSON.parse(localStorage.getItem("vyro_waitlist") || "[]");
-      list.push({ email: email.trim(), at: Date.now() });
-      localStorage.setItem("vyro_waitlist", JSON.stringify(list));
+      const parsed = JSON.parse(localStorage.getItem("vyro_waitlist") || "[]");
+      const list: { email?: string; at?: number }[] = Array.isArray(parsed) ? parsed : [];
+      const already = list.some((entry) => entry?.email?.toLowerCase() === value.toLowerCase());
+      if (!already) {
+        list.push({ email: value, at: Date.now() });
+        localStorage.setItem("vyro_waitlist", JSON.stringify(list));
+      }
     } catch {}
     setWaitlisted(true);
+    return true;
+  }
+
+  function handleWaitlistSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    joinWaitlist(email);
+  }
+
+  function handleStickySubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!joinWaitlist(stickyEmail)) return;
+    setStickyEmail("");
+    setStickySuccess(true);
+    if (stickySuccessTimer.current) window.clearTimeout(stickySuccessTimer.current);
+    stickySuccessTimer.current = window.setTimeout(() => setStickySuccess(false), 2600);
   }
 
   function handleCreatorSubmit(e: React.FormEvent) {
@@ -323,7 +361,10 @@ export default function Page() {
         <section ref={waitlistRef} className="band-raised scroll-mt-10 px-5 py-20 sm:px-8">
           <div className="mx-auto max-w-[560px]">
             <Reveal>
-              <div className="rounded-[28px] border border-lime/[.16] bg-gradient-to-b from-surface-warm to-[#0b0f09] p-7 shadow-[0_30px_70px_-30px_rgba(0,0,0,.85),0_0_60px_-30px_rgba(204,255,0,.4),inset_0_1px_0_rgba(204,255,0,.10)] sm:p-8">
+              <div
+                ref={waitlistCardRef}
+                className="rounded-[28px] border border-lime/[.16] bg-gradient-to-b from-surface-warm to-[#0b0f09] p-7 shadow-[0_30px_70px_-30px_rgba(0,0,0,.85),0_0_60px_-30px_rgba(204,255,0,.4),inset_0_1px_0_rgba(204,255,0,.10)] sm:p-8"
+              >
                 <div className="font-display text-[10.5px] font-extrabold tracking-[.14em] text-lime">
                   JOIN THE WAITLIST
                 </div>
@@ -437,20 +478,46 @@ export default function Page() {
         </section>
       </div>
 
-      {/* ───────────── sticky mini-CTA ───────────── */}
-      {showSticky && !waitlisted && (
+      {/* ───────────── sticky mini email capture ───────────── */}
+      {/* Stays mounted through the confirmation flash, then leaves for good. */}
+      {((showSticky && !waitlisted) || stickySuccess) && (
         <div className="fixed inset-x-0 bottom-0 z-40 animate-stickyIn px-4 pb-4 sm:pb-5">
-          <div className="mx-auto flex max-w-[420px] items-center gap-3 rounded-full border border-lime/25 bg-surface-warm/90 py-2 pl-4 pr-2 shadow-[0_18px_40px_-16px_rgba(0,0,0,.9),0_0_40px_-20px_rgba(204,255,0,.6)] backdrop-blur-xl">
-            <span className="min-w-0 flex-1 truncate font-display text-[12px] font-bold text-white/70">
-              $500 challenge · launch week
-            </span>
-            <button
-              type="button"
-              onClick={scrollToWaitlist}
-              className="flex-shrink-0 rounded-full bg-gradient-to-br from-lime-bright via-lime to-lime-deep px-5 py-2.5 font-display text-[12.5px] font-extrabold tracking-tight text-lime-ink shadow-[0_8px_20px_-8px_rgba(204,255,0,.7)] transition-transform hover:-translate-y-0.5 active:scale-[.98]"
-            >
-              Join the waitlist
-            </button>
+          <div className="mx-auto max-w-[420px] rounded-full border border-lime/25 bg-surface-warm/90 p-1.5 shadow-[0_18px_40px_-16px_rgba(0,0,0,.9),0_0_40px_-20px_rgba(204,255,0,.6)] backdrop-blur-xl">
+            {stickySuccess ? (
+              <div className="flex items-center justify-center gap-2 py-2.5">
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                  className="h-[17px] w-[17px] flex-shrink-0 stroke-lime"
+                  fill="none"
+                  strokeWidth="2.6"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span className="font-display text-[12.5px] font-extrabold text-lime">
+                  You&rsquo;re on the list.
+                </span>
+              </div>
+            ) : (
+              <form onSubmit={handleStickySubmit} className="flex items-center gap-1.5">
+                <input
+                  type="email"
+                  required
+                  value={stickyEmail}
+                  onChange={(e) => setStickyEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  aria-label="Email address"
+                  className="min-w-0 flex-1 rounded-full bg-transparent px-4 py-2 text-[13px] font-medium text-white placeholder:text-white/35 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="flex-shrink-0 rounded-full bg-gradient-to-br from-lime-bright via-lime to-lime-deep px-4 py-2.5 font-display text-[12.5px] font-extrabold tracking-tight text-lime-ink shadow-[0_8px_20px_-8px_rgba(204,255,0,.7)] transition-transform hover:-translate-y-0.5 active:scale-[.98]"
+                >
+                  Join
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
