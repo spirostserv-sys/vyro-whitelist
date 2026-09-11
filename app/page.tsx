@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { normalizeEmail, saveSignup, type SignupSource } from "./lib/waitlist";
+
 /*
   THESIS: The $500 launch-week challenge is the hook, so it sits one short scroll from the
   headline — proof and explanation come after the reason to act, not before it.
@@ -20,11 +22,9 @@ import { useEffect, useRef, useState } from "react";
 
 const VALID_CREATOR_CODES = ["VYROCREATOR", "ALPHA", "FOUNDER", "VIP1"];
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   PLACEHOLDER LAUNCH DATE — stand-in until the real launch date is locked.
-   Swap this one line; the countdown and every "launch week" line read from it.
-   ───────────────────────────────────────────────────────────────────────────── */
-const LAUNCH_DATE = new Date("2026-10-05T12:00:00Z");
+/* Drop the hero clip here — public/videos/gameplay-clip.mp4 — and it plays
+   automatically. No file yet means the placeholder shows instead. */
+const GAMEPLAY_CLIP_SRC = "/videos/gameplay-clip.mp4";
 
 type CreatorState = "idle" | "checking" | "granted" | "invalid";
 
@@ -42,6 +42,9 @@ export default function Page() {
   // submission itself goes through the same path as the page form.
   const [stickyEmail, setStickyEmail] = useState("");
   const [stickySuccess, setStickySuccess] = useState(false);
+
+  // Flipped by the <video> element's onError — i.e. no file, or an undecodable one.
+  const [videoFailed, setVideoFailed] = useState(false);
 
   const inviteInputRef = useRef<HTMLInputElement | null>(null);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
@@ -92,32 +95,40 @@ export default function Page() {
   }
 
   /* The one place a signup is recorded. Both the page form and the sticky bar call
-     it, so the two entry points cannot drift apart, and re-submitting the same
-     address (once from each) stores a single entry. */
-  function joinWaitlist(rawEmail: string): boolean {
-    const value = rawEmail.trim();
+     it, so the two entry points cannot drift apart.
+
+     The success state is shown immediately and the Supabase insert runs behind it:
+     a signup should never be gated on a network round trip, and a visitor cannot
+     act on "the database is down" anyway. Failures are logged for debugging, and
+     localStorage keeps a local copy either way. */
+  function joinWaitlist(rawEmail: string, source: SignupSource): boolean {
+    const value = normalizeEmail(rawEmail);
     if (!value) return false;
+
     try {
       const parsed = JSON.parse(localStorage.getItem("vyro_waitlist") || "[]");
-      const list: { email?: string; at?: number }[] = Array.isArray(parsed) ? parsed : [];
-      const already = list.some((entry) => entry?.email?.toLowerCase() === value.toLowerCase());
+      const list: { email?: string; at?: number; source?: string }[] = Array.isArray(parsed) ? parsed : [];
+      const already = list.some((entry) => entry?.email?.toLowerCase() === value);
       if (!already) {
-        list.push({ email: value, at: Date.now() });
+        list.push({ email: value, at: Date.now(), source });
         localStorage.setItem("vyro_waitlist", JSON.stringify(list));
       }
     } catch {}
+
+    void saveSignup(value, source);
+
     setWaitlisted(true);
     return true;
   }
 
   function handleWaitlistSubmit(e: React.FormEvent) {
     e.preventDefault();
-    joinWaitlist(email);
+    joinWaitlist(email, "main_form");
   }
 
   function handleStickySubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!joinWaitlist(stickyEmail)) return;
+    if (!joinWaitlist(stickyEmail, "sticky_bar")) return;
     setStickyEmail("");
     setStickySuccess(true);
     if (stickySuccessTimer.current) window.clearTimeout(stickySuccessTimer.current);
@@ -204,19 +215,40 @@ export default function Page() {
                   background: "radial-gradient(ellipse 100% 55% at 50% 6%, rgba(200,255,0,.16), transparent 62%)",
                 }}
               />
-              {/* line-art stand-in so the slot reads as gameplay, not a dead box */}
-              <PushUpFigure className="pointer-events-none absolute inset-x-0 bottom-7 mx-auto w-[78%] opacity-[.28]" />
-              <div
-                aria-hidden
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-lime/25 bg-lime/[.07]"
-              >
-                <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 fill-lime">
-                  <path d="M6 4l14 8-14 8z" />
-                </svg>
-              </div>
-              <span className="relative px-3 text-center text-[9.5px] font-semibold leading-tight tracking-wide text-white/35">
-                Gameplay clip coming soon
-              </span>
+              {/* Drop a file at public/videos/gameplay-clip.mp4 and it plays here.
+                  Until then — or if it fails to decode — onError swaps in the
+                  placeholder below, so a missing file never shows a broken-media icon. */}
+              {!videoFailed && (
+                <video
+                  className="absolute inset-0 h-full w-full object-cover"
+                  src={GAMEPLAY_CLIP_SRC}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  aria-label="VYRO gameplay preview"
+                  onError={() => setVideoFailed(true)}
+                />
+              )}
+
+              {videoFailed && (
+                <>
+                  {/* line-art stand-in so the slot reads as gameplay, not a dead box */}
+                  <PushUpFigure className="pointer-events-none absolute inset-x-0 bottom-7 mx-auto w-[78%] opacity-[.28]" />
+                  <div
+                    aria-hidden
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full border border-lime/25 bg-lime/[.07]"
+                  >
+                    <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 fill-lime">
+                      <path d="M6 4l14 8-14 8z" />
+                    </svg>
+                  </div>
+                  <span className="relative px-3 text-center text-[9.5px] font-semibold leading-tight tracking-wide text-white/35">
+                    Gameplay clip coming soon
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -255,10 +287,7 @@ export default function Page() {
                 </span>
               </div>
 
-              {/* ── 4. countdown ── */}
-              <Countdown />
-
-              <div className="mt-6 h-px bg-gradient-to-r from-transparent via-lime/25 to-transparent" />
+              <div className="mt-7 h-px bg-gradient-to-r from-transparent via-lime/25 to-transparent" />
 
               <dl className="mt-6 flex flex-col gap-5">
                 <TermRow icon={<ClockIcon />} label="The rule">
@@ -554,63 +583,6 @@ function Reveal({ children, className = "" }: { children: React.ReactNode; class
   return (
     <div ref={ref} className={`reveal ${className}`}>
       {children}
-    </div>
-  );
-}
-
-/* ───────────── countdown ───────────── */
-
-function Countdown() {
-  // null until mounted so server and client render the same markup, then it ticks.
-  const [left, setLeft] = useState<{ d: number; h: number; m: number } | null>(null);
-
-  useEffect(() => {
-    function tick() {
-      const ms = LAUNCH_DATE.getTime() - Date.now();
-      if (ms <= 0) {
-        setLeft({ d: 0, h: 0, m: 0 });
-        return;
-      }
-      const totalMinutes = Math.floor(ms / 60000);
-      setLeft({
-        d: Math.floor(totalMinutes / 1440),
-        h: Math.floor((totalMinutes % 1440) / 60),
-        m: totalMinutes % 60,
-      });
-    }
-    tick();
-    const id = window.setInterval(tick, 30000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const live = left !== null && (left.d > 0 || left.h > 0 || left.m > 0);
-
-  return (
-    <div className="mt-6 rounded-2xl border border-lime/20 bg-[#080b06]/60 p-4">
-      <div className="flex items-center gap-1.5">
-        <span className="h-[5px] w-[5px] animate-pulseDot rounded-full bg-lime" />
-        <span className="font-display text-[9.5px] font-extrabold uppercase tracking-[.14em] text-lime-text/75">
-          {live || left === null ? "Launch week starts in" : "Launch week is live"}
-        </span>
-      </div>
-      <div className="mt-3 flex gap-2.5">
-        <CountUnit value={left?.d} label="Days" />
-        <CountUnit value={left?.h} label="Hours" />
-        <CountUnit value={left?.m} label="Mins" />
-      </div>
-    </div>
-  );
-}
-
-function CountUnit({ value, label }: { value?: number; label: string }) {
-  return (
-    <div className="flex-1 rounded-xl border border-lime/[.14] bg-gradient-to-b from-lime/[.07] to-transparent py-2.5 text-center">
-      <div className="font-display text-[26px] font-black leading-none tracking-tight text-white [font-variant-numeric:tabular-nums]">
-        {value === undefined ? "––" : String(value).padStart(2, "0")}
-      </div>
-      <div className="mt-1 font-display text-[8.5px] font-extrabold uppercase tracking-[.14em] text-white/35">
-        {label}
-      </div>
     </div>
   );
 }
